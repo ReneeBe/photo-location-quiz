@@ -13,17 +13,39 @@ interface GeminiResponse {
   error?: { message: string };
 }
 
+const MAGICLINK_URL = 'https://magiclink.reneebe.workers.dev';
+
 async function generate(apiKey: string, parts: object[]): Promise<string> {
-  const res = await fetch(`${BASE}/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }] }),
-  });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as GeminiResponse;
-    throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+  let data: GeminiResponse;
+
+  if (window.magiclink?.hasToken) {
+    const token = localStorage.getItem('magiclink_token');
+    const res = await fetch(`${MAGICLINK_URL}/api/proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        projectId: 'photo-location-quiz',
+        provider: 'gemini',
+        request: { model: MODEL, contents: [{ parts }] },
+      }),
+    });
+    const json = await res.json() as { result?: GeminiResponse; error?: string };
+    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+    data = json.result!;
+  } else {
+    const res = await fetch(`${BASE}/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }] }),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as GeminiResponse;
+      throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
+    }
+    data = (await res.json()) as GeminiResponse;
   }
-  const data = (await res.json()) as GeminiResponse;
+
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
   return raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 }

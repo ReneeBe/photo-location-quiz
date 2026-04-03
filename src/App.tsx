@@ -34,8 +34,10 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addMoreRef = useRef<HTMLInputElement>(null);
 
+  const hasMagicLink = !!window.magiclink?.hasToken;
+
   const handleFiles = async (files: FileList) => {
-    if (!apiKey.trim()) return;
+    if (!hasMagicLink && !apiKey.trim()) return;
     setPhase('processing');
     const arr = Array.from(files);
     const photos = await process(arr, apiKey);
@@ -50,7 +52,7 @@ export default function App() {
   };
 
   const handleAddMore = async (files: FileList) => {
-    if (!apiKey.trim()) return;
+    if (!hasMagicLink && !apiKey.trim()) return;
     const previousPhotos = allPhotos;
     setPhase('processing');
     const arr = Array.from(files);
@@ -140,23 +142,30 @@ export default function App() {
           {/* Setup */}
           {phase === 'setup' && (
             <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-zinc-400">Gemini API Key</label>
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIza..."
-                  className="w-full px-4 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                />
-                <p className="text-xs text-zinc-600">Stored in session only.</p>
-              </div>
+              {hasMagicLink ? (
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-violet-400">Demo mode active</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">You have 5 uses — no API key needed.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-zinc-400">Gemini API Key</label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="AIza..."
+                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-zinc-600">Stored in session only.</p>
+                </div>
+              )}
 
               {processError && (
                 <p className="text-xs text-red-400 bg-red-950/50 border border-red-900 rounded-xl px-4 py-3">{processError}</p>
               )}
 
-              {apiKey.trim() ? (
+              {(hasMagicLink || apiKey.trim()) ? (
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   className="flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-zinc-700 hover:border-violet-500 hover:bg-zinc-800/50 cursor-pointer transition-all"
