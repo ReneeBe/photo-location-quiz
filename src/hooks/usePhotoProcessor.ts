@@ -28,7 +28,7 @@ export function usePhotoProcessor() {
   const [status, setStatus] = useState<ProcessingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const process = async (files: File[], apiKey: string): Promise<Photo[] | null> => {
+  const process = async (files: File[]): Promise<Photo[] | null> => {
     setError(null);
     try {
       const sampled = files.length > MAX_PHOTOS ? shuffle(files).slice(0, MAX_PHOTOS) : [...files];
@@ -85,7 +85,7 @@ export function usePhotoProcessor() {
 
         let categories: Category[];
         try {
-          categories = await categorizePhotos(apiKey, images);
+          categories = await categorizePhotos(images);
         } catch {
           categories = batch.map(() => 'other' as Category);
         }

@@ -1,50 +1,31 @@
 import type { Category, CityOption } from '../types';
 
-const BASE = import.meta.env.DEV
-  ? '/api/gemini'
-  : 'https://generativelanguage.googleapis.com';
-
 const MODEL = 'gemini-3.1-pro-preview';
 
 const VALID_CATEGORIES = ['food','sunset','nature','cityscape','people','pets','architecture','events','other'];
+
+const MAGICLINK_URL = 'https://magiclink.reneebe.workers.dev';
 
 interface GeminiResponse {
   candidates?: Array<{ content: { parts: Array<{ text: string }> } }>;
   error?: { message: string };
 }
 
-const MAGICLINK_URL = 'https://magiclink.reneebe.workers.dev';
-
-async function generate(apiKey: string, parts: object[]): Promise<string> {
-  let data: GeminiResponse;
-
-  if (window.magiclink?.hasToken) {
-    const token = localStorage.getItem('magiclink_token');
-    const res = await fetch(`${MAGICLINK_URL}/api/proxy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        projectId: 'photo-location-quiz',
-        provider: 'gemini',
-        request: { model: MODEL, contents: [{ parts }] },
-      }),
-    });
-    const json = await res.json() as { result?: GeminiResponse; error?: string };
-    if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-    data = json.result!;
-  } else {
-    const res = await fetch(`${BASE}/v1beta/models/${MODEL}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] }),
-    });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as GeminiResponse;
-      throw new Error(err?.error?.message ?? `HTTP ${res.status}`);
-    }
-    data = (await res.json()) as GeminiResponse;
-  }
+async function generate(parts: object[]): Promise<string> {
+  const token = localStorage.getItem('magiclink_token');
+  const res = await fetch(`${MAGICLINK_URL}/api/proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...(token ? { token } : {}),
+      projectId: 'photo-location-quiz',
+      provider: 'gemini',
+      request: { model: MODEL, contents: [{ parts }] },
+    }),
+  });
+  const json = await res.json() as { result?: GeminiResponse; error?: string };
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+  const data = json.result!;
 
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
   return raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
@@ -52,7 +33,6 @@ async function generate(apiKey: string, parts: object[]): Promise<string> {
 
 // Categorize a batch of up to 5 images
 export async function categorizePhotos(
-  apiKey: string,
   images: { base64: string; mimeType: string }[]
 ): Promise<Category[]> {
   const imageParts = images.map((img, i) => [
@@ -66,7 +46,7 @@ Choose one category per image from: food, sunset, nature, cityscape, people, pet
 Return ONLY a JSON array of strings, one per image, e.g. ["food","sunset","nature"].`,
   };
 
-  const raw = await generate(apiKey, [...imageParts, prompt]);
+  const raw = await generate([...imageParts, prompt]);
   let result: string[];
   try {
     result = JSON.parse(raw) as string[];
@@ -81,7 +61,6 @@ Return ONLY a JSON array of strings, one per image, e.g. ["food","sunset","natur
 
 // Generate 3 decoy city options for a quiz question
 export async function generateDecoys(
-  apiKey: string,
   correctCity: string,
   correctCountry: string,
   correctLat: number,
@@ -94,7 +73,7 @@ Include variety: one nearby city, one on the same continent, one on a different 
 Return ONLY a JSON array of exactly 3 objects:
 [{"city":"...","country":"...","lat":0.0,"lon":0.0}]`;
 
-  const raw = await generate(apiKey, [{ text: prompt }]);
+  const raw = await generate([{ text: prompt }]);
   try {
     const decoys = JSON.parse(raw) as CityOption[];
     return decoys.slice(0, 3);
